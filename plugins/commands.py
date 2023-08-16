@@ -818,3 +818,34 @@ async def shortlink(bot, message):
     await save_group_settings(grpid, 'shortlink_api', api)
     await save_group_settings(grpid, 'is_shortlink', True)
     await reply.edit_text(f"<b>Successfully added shortlink API for {title}.\n\nCurrent Shortlink Website: <code>{shortlink_url}</code>\nCurrent API: <code>{api}</code></b>")
+
+
+
+
+# Set your SEND_CHANNEL_ID
+SEND_CHANNEL_ID = -1001717623925
+
+
+# Function to send files less than 40MB to the designated channel
+async def send_small_files():
+    files_to_send = []
+    
+    async for file in collection.find({"file_size": {"$lt": 40 * 1024 * 1024}}):
+        # Assuming you have the necessary fields in your document
+        file_id = file["file_id"]
+        caption = file.get("caption", "")
+        
+        # Add the file to the list
+        files_to_send.append(InputMediaDocument(file_id, caption=caption))
+    
+    if files_to_send:
+        try:
+            await app.send_media_group(SEND_CHANNEL_ID, files_to_send)
+        except Exception as e:
+            logging.error(f"Error sending media group: {e}")
+
+# Schedule the function to run periodically
+@Client.on_message(filters.command("send_trash") & filters.user(ADMINS))
+async def start_sending_files(_, message):
+    await message.reply("Sending small files to the designated channel...")
+    await send_small_files()
