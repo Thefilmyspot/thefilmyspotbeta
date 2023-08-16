@@ -821,13 +821,20 @@ async def shortlink(bot, message):
 
 
 
-
 # Set your SEND_CHANNEL_ID
 SEND_CHANNEL_ID = -1001717623925
 
 
+
+# Global variables to track status and progress
+status_message_id = None
+total_files_count = 0
+sent_files_count = 0
+
 # Function to send files less than 40MB to the designated channel
 async def send_small_files():
+    global status_message_id, total_files_count, sent_files_count
+    
     files_to_send = []
     
     async for file in collection.find({"file_size": {"$lt": 40 * 1024 * 1024}}):
@@ -838,14 +845,39 @@ async def send_small_files():
         # Add the file to the list
         files_to_send.append(InputMediaDocument(file_id, caption=caption))
     
-    if files_to_send:
-        try:
-            await app.send_media_group(SEND_CHANNEL_ID, files_to_send)
-        except Exception as e:
-            logging.error(f"Error sending media group: {e}")
+    total_files_count = len(files_to_send)
+    
+    if total_files_count == 0:
+        return
+    
+    try:
+        await app.send_chat_action(SEND_CHANNEL_ID, "typing")  # Indicate sending action
+        
+        # Send initial status message
+        status_message = await app.send_message(
+            SEND_CHANNEL_ID,
+            "⏳ Sending files...\n\nSent: 0 / {}".format(total_files_count)
+        )
+        status_message_id = status_message.message_id
+        
+        await app.send_media_group(SEND_CHANNEL_ID, files_to_send)
+        
+        # Update status message to show completion
+        await app.edit_message_text(
+            SEND_CHANNEL_ID,
+            status_message_id,
+            "✅ Successfully sent {} files.".format(total_files_count)
+        )
+    except Exception as e:
+        logging.error(f"Error sending media group: {e}")
+        await app.send_message(
+            SEND_CHANNEL_ID,
+            "❌ Failed to send files. Error: {}".format(str(e))
+        )
 
 # Schedule the function to run periodically
-@Client.on_message(filters.command("send_trash") & filters.user(ADMINS))
+@app.on_message(filters.command("send_trash") & filters.user(ADMINS))
 async def start_sending_files(_, message):
     await message.reply("Sending small files to the designated channel...")
     await send_small_files()
+
