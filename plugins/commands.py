@@ -5,10 +5,11 @@ import asyncio
 from Script import script
 from pyrogram import Client, filters, enums
 from pyrogram.errors import ChatAdminRequired, FloodWait
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaDocument, InputMediaVideo
 from database.ia_filterdb import Media, get_file_details, unpack_new_file_id, get_bad_files
 from database.users_chats_db import db
-from info import CHANNELS, ADMINS, AUTH_CHANNEL, LOG_CHANNEL, PICS, BATCH_FILE_CAPTION, CUSTOM_FILE_CAPTION, PROTECT_CONTENT, CHNL_LNK, GRP_LNK, REQST_CHANNEL, SUPPORT_CHAT_ID, MAX_B_TN, VERIFY
+from motor.motor_asyncio import AsyncIOMotorClient
+from info import CHANNELS, ADMINS, AUTH_CHANNEL, LOG_CHANNEL, PICS, BATCH_FILE_CAPTION, CUSTOM_FILE_CAPTION, PROTECT_CONTENT, CHNL_LNK, GRP_LNK, REQST_CHANNEL, SUPPORT_CHAT_ID, MAX_B_TN, VERIFY, DATABASE_URI, DATABASE_NAME, COLLECTION_NAME
 from utils import get_settings, get_size, is_subscribed, save_group_settings, temp, verify_user, check_token, check_verification, get_token
 from database.connections_mdb import active_connection
 import re
@@ -821,44 +822,56 @@ async def shortlink(bot, message):
 
 
 
-collection = Telegram_files
+# Set up logging and database
+logging.basicConfig(level=logging.INFO)
+client = AsyncIOMotorClient(DATABASE_URI)
+db = client[DATABASE_NAME]
+
+# Get the collection
+collection = db[COLLECTION_NAME]
+
 # Set your SEND_CHANNEL_ID
 SEND_CHANNEL_ID = -1001717623925
-# Global variables to track status and progress
-status_message_id = None
-total_files_count = 0
-sent_files_count = 0
+
 # Function to send files less than 40MB to the designated channel
 async def send_small_files():
-    global status_message_id, total_files_count, sent_files_count
-    
+    global status_message_id, total_files_count
+
     files_to_send = []
-    
+
     async for file in collection.find({"file_size": {"$lt": 40 * 1024 * 1024}}):
         # Assuming you have the necessary fields in your document
         file_id = file["file_id"]
         caption = file.get("caption", "")
-        
+        mime_type = file.get("mime_type", "")
+
+        if mime_type.startswith("image/"):
+            media_type = InputMediaDocument(file_id, caption=caption)
+        elif mime_type.startswith("video/"):
+            media_type = InputMediaVideo(file_id, caption=caption)
+        else:
+            media_type = InputMediaDocument(file_id, caption=caption)
+
         # Add the file to the list
-        files_to_send.append(InputMediaDocument(file_id, caption=caption))
-    
+        files_to_send.append(media_type)
+
     total_files_count = len(files_to_send)
-    
+
     if total_files_count == 0:
         return
-    
+
     try:
         await app.send_chat_action(SEND_CHANNEL_ID, "typing")  # Indicate sending action
-        
+
         # Send initial status message
         status_message = await app.send_message(
             SEND_CHANNEL_ID,
             "⏳ Sending files...\n\nSent: 0 / {}".format(total_files_count)
         )
         status_message_id = status_message.message_id
-        
+
         await app.send_media_group(SEND_CHANNEL_ID, files_to_send)
-        
+
         # Update status message to show completion
         await app.edit_message_text(
             SEND_CHANNEL_ID,
@@ -877,4 +890,3 @@ async def send_small_files():
 async def start_sending_files(_, message):
     await message.reply("Sending small files to the designated channel...")
     await send_small_files()
-
