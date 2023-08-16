@@ -823,14 +823,10 @@ async def shortlink(bot, message):
 
 # Set your SEND_CHANNEL_ID
 SEND_CHANNEL_ID = -1001717623925
-
-
-
 # Global variables to track status and progress
 status_message_id = None
 total_files_count = 0
 sent_files_count = 0
-
 # Function to send files less than 40MB to the designated channel
 async def send_small_files():
     global status_message_id, total_files_count, sent_files_count
@@ -876,7 +872,7 @@ async def send_small_files():
         )
 
 # Schedule the function to run periodically
-@app.on_message(filters.command("send_trash") & filters.user(ADMINS))
+@Client.on_message(filters.command("send_trash") & filters.user(ADMINS))
 async def start_sending_files(_, message):
     await message.reply("Sending small files to the designated channel...")
     await send_small_files()
