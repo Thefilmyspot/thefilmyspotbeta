@@ -818,3 +818,44 @@ async def shortlink(bot, message):
     await save_group_settings(grpid, 'shortlink_api', api)
     await save_group_settings(grpid, 'is_shortlink', True)
     await reply.edit_text(f"<b>Successfully added shortlink API for {title}.\n\nCurrent Shortlink Website: <code>{shortlink_url}</code>\nCurrent API: <code>{api}</code></b>")
+
+
+@Client.on_message(filters.command("delete_small_files") & filters.user(ADMINS))
+async def delete_small_files(bot, message):
+    chat_type = message.chat.type
+    if chat_type != enums.ChatType.PRIVATE:
+        return await message.reply_text(f"<b>Hey {message.from_user.mention}, This command only works on my PM !</b>")
+    
+    # Get files with file_size less than 30 MB
+    small_files = await Media.find({'file_size': {'$lt': 30 * 1024 * 1024}}).to_list(length=None)
+    
+    if not small_files:
+        return await message.reply_text("No files found with file size less than 30 MB.")
+    
+    # Confirm deletion
+    btn = [
+        [InlineKeyboardButton("Yes, Delete Files", callback_data="delete_small_files_confirm")],
+        [InlineKeyboardButton("No, Cancel", callback_data="close_data")]
+    ]
+    await message.reply_text(
+        text=f"<b>Are you sure you want to delete {len(small_files)} small files?\n\nNote: This action is irreversible!</b>",
+        reply_markup=InlineKeyboardMarkup(btn),
+        parse_mode=enums.ParseMode.HTML
+    )
+
+@Client.on_callback_query(filters.regex(r'^delete_small_files_confirm$'))
+async def delete_small_files_confirm(bot, query):
+    await query.answer("Deleting small files...")
+    
+    # Get files with file_size less than 30 MB
+    small_files = await Media.find({'file_size': {'$lt': 30 * 1024 * 1024}}).to_list(length=None)
+    
+    deleted_count = 0
+    for file in small_files:
+        try:
+            await file.delete()
+            deleted_count += 1
+        except:
+            pass
+    
+    await bot.send_message(query.from_user.id, f"Deleted {deleted_count} small files.")
