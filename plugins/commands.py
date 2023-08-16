@@ -821,6 +821,7 @@ async def shortlink(bot, message):
 
 
 
+
 # Set your SEND_CHANNEL_ID
 SEND_CHANNEL_ID = -1001717623925
 # Global variables to track status and progress
