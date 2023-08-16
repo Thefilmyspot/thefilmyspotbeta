@@ -821,7 +821,7 @@ async def shortlink(bot, message):
 
 
 
-collection = Telegram_Files
+collection = Telegram_files
 # Set your SEND_CHANNEL_ID
 SEND_CHANNEL_ID = -1001717623925
 # Global variables to track status and progress
